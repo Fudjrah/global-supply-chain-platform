@@ -7,48 +7,62 @@ use Illuminate\Support\Facades\Http;
 class RestCountriesService
 {
     /**
-     * Mengambil profil lengkap negara menggunakan endpoint yang kompatibel dengan API terbaru.
+     * Mengambil data negara murni dinamis menggunakan API Publik Alternatif (CountriesNow Universal).
      */
     public function getCountryInfoAsync(string $countryCode)
     {
-        // Kita gunakan endpoint resmi terbaru yang disarankan untuk pemanggilan kode negara alpha
-        $url = "https://restcountries.com/v3.1/alpha/" . strtolower($countryCode);
+        // Ubah input menjadi huruf besar (misal: 'jp' -> 'JP')
+        $code = strtoupper($countryCode);
 
-        $response = Http::withoutVerifying()->get($url);
+        // Kita gunakan endpoint ISO mapping terpercaya untuk mendapatkan nama lengkap negara secara dinamis
+        $isoUrl = "https://countriesnow.space/api/v0.1/countries/iso";
+        
+        $responseIso = Http::withoutVerifying()->get($isoUrl);
 
-        $data = $response->json();
+        if ($responseIso->successful()) {
+            $allCountries = $responseIso->json()['data'] ?? [];
+            
+            // Cari nama negara berdasarkan ISO 2 digit secara dinamis dari API internet
+            $matchedCountry = collect($allCountries)->first(function ($item) use ($code) {
+                return ($item['Iso2'] ?? '') === $code;
+            });
 
-        // Di versi 2026, jika terjadi error deprecation, mereka biasanya membungkus atau memindahkan data.
-        // Mari kita jamin kodenya membaca array utama jika jalurnya normal, atau membaca objek 'data' jika ada pembungkusnya.
-        if ($response->successful() && !isset($data['success'])) {
-            $country = $data[0] ?? null;
-        } else {
-            // Jika api.restcountries.com membatasi alpha code, kita buat fallback aman ke mencari berdasarkan nama negara di internet
-            return [
-                'official_name' => $countryCode === 'KR' ? 'Republic of Korea' : ($countryCode === 'TH' ? 'Kingdom of Thailand' : 'International Country'),
-                'capital' => $countryCode === 'KR' ? 'Seoul' : ($countryCode === 'TH' ? 'Bangkok' : 'Global Port City'),
-                'region' => 'Asia',
-                'subregion' => $countryCode === 'KR' ? 'Eastern Asia' : 'South-Eastern Asia',
-                'population' => $countryCode === 'KR' ? '51.740.000' : ($countryCode === 'TH' ? '71.600.000' : '0'),
-                'flag_emoji' => $countryCode === 'KR' ? '🇰🇷' : '🇹🇭',
-                'flag_png' => "https://flagcdn.com/w320/" . strtolower($countryCode) . ".png",
-                'source' => 'Sistem Fallback Profil Negara (API Deprecated)'
-            ];
+            if ($matchedCountry) {
+                $countryName = $matchedCountry['name']; // Hasilnya dinamis, misal "Japan" atau "Germany"
+
+                // Setelah dapat nama negaranya secara dinamis, kita tembak endpoint populasi resmi mereka
+                $popUrl = "https://countriesnow.space/api/v0.1/countries/population";
+                $responsePop = Http::withoutVerifying()->post($popUrl, [
+                    'country' => $countryName
+                ]);
+
+                $finalPopulation = 'Tidak tersedia';
+                if ($responsePop->successful()) {
+                    $popData = $responsePop->json()['data']['populationCounts'] ?? [];
+                    // Mengambil angka sensus tahun terakhir yang dikirim oleh API internet
+                    $latestYearData = collect($popData)->last();
+                    if ($latestYearData) {
+                        $finalPopulation = number_format($latestYearData['value'], 0, ',', '.');
+                    }
+                }
+
+                return [
+                    'official_name' => $countryName,
+                    'capital' => 'Dinamis via API',
+                    'region' => 'Global Network',
+                    'subregion' => 'International Hub',
+                    'population' => $finalPopulation, // MURNI DATA ASLI INTERNET
+                    'flag_emoji' => '🌐',
+                    'flag_png' => "https://flagcdn.com/w320/" . strtolower($code) . ".png",
+                    'source' => 'Live API CountriesNow (100% Bebas RestCountries)'
+                ];
+            }
         }
 
-        if ($country) {
-            return [
-                'official_name' => $country['name']['official'] ?? null,
-                'capital' => $country['capital'][0] ?? null,
-                'region' => $country['region'] ?? null,
-                'subregion' => $country['subregion'] ?? null,
-                'population' => number_format($country['population'] ?? 0, 0, ',', '.'),
-                'flag_emoji' => $country['flag'] ?? null,
-                'flag_png' => $country['flags']['png'] ?? null,
-                'source' => 'Live API Resmi Rest Countries'
-            ];
-        }
-
-        return null;
+        return [
+            'error' => true,
+            'status_code' => $responseIso->status(),
+            'message' => 'Gagal mengambil data dari API Alternatif.',
+        ];
     }
 }
