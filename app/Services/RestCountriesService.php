@@ -65,4 +65,26 @@ class RestCountriesService
             'message' => 'Gagal mengambil data dari API Alternatif.',
         ];
     }
+    public function getCoordinatesAsync(string $countryName)
+{
+    try {
+        // Menggunakan Nominatim (OpenStreetMap) untuk mencari koordinat
+        $response = Http::withoutVerifying()->get("https://nominatim.openstreetmap.org/search", [
+            'q' => $countryName,
+            'format' => 'json',
+            'limit' => 1
+        ]);
+
+        if ($response->successful() && !empty($response->json())) {
+            $data = $response->json()[0];
+            return [
+                'lat' => (float)$data['lat'],
+                'lon' => (float)$data['lon']
+            ];
+        }
+    } catch (\Exception $e) {
+        return ['lat' => 0, 'lon' => 0];
+    }
+    return ['lat' => 0, 'lon' => 0];
+}
 }

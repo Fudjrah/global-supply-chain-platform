@@ -3,31 +3,34 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class WeatherService
 {
-    /**
-     * Mengambil data cuaca real-time (Wajib Live API).
-     */
     public function getWeatherAsync(float $latitude, float $longitude)
     {
-        $url = "https://api.open-meteo.com/v1/forecast";
+        try {
+            $url = "https://api.open-meteo.com/v1/forecast";
 
-        // Kita tembak langsung tanpa jaring pengaman fallback
-        $response = Http::withoutVerifying()->get($url, [
-            'latitude' => $latitude,
-            'longitude' => $longitude,
-            'current_weather' => true,
-        ]);
+            // Menggunakan 'current' daripada 'current_weather' (format terbaru)
+            $response = Http::timeout(5)->withoutVerifying()->get($url, [
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'current' => 'temperature_2m,wind_speed_10m,weather_code',
+            ]);
 
-        if ($response->successful()) {
-            $data = $response->json();
-            return [
-                'temperature' => $data['current_weather']['temperature'] ?? null,
-                'windspeed' => $data['current_weather']['windspeed'] ?? null,
-                'weathercode' => $data['current_weather']['weathercode'] ?? null,
-                'source' => 'Live API Resmi Open-Meteo'
-            ];
+            if ($response->successful()) {
+                $data = $response->json();
+                return [
+                    'temperature' => $data['current']['temperature_2m'] ?? null,
+                    'windspeed'   => $data['current']['wind_speed_10m'] ?? null,
+                    'weathercode' => $data['current']['weather_code'] ?? null,
+                    'source'      => 'Live API Resmi Open-Meteo'
+                ];
+            }
+        } catch (\Exception $e) {
+            // Jika gagal, kita catat error-nya di log agar bisa dicek nanti
+            Log::error("Weather API Error: " . $e->getMessage());
         }
 
         return null;
