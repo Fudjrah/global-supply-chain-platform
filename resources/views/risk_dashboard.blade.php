@@ -4,7 +4,7 @@
     <title>Global Supply Chain Risk - Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
- 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-100 p-8">
     <div class="max-w-4xl mx-auto">
@@ -45,17 +45,73 @@
             </div>
         </div>
 
-        <!-- Lokasi Geografis (map rendered below) -->
-        <div class="mb-8">
-            <h2 class="text-xl font-bold mb-4">Lokasi Geografis</h2>
-            <p class="text-gray-600">Peta ditampilkan di bagian "Map Section" di bawah.</p>
-        </div>
+<!-- Grafik GDP -->
+<div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8 w-full">
+    <h2 class="text-lg font-bold mb-4 text-gray-700">Tren GDP Growth (%)</h2>
+  <div class="relative w-full h-[300px]">
+    <canvas id="gdpChart"></canvas>
+</div>
+</div>
+
+<!-- Grafik Inflasi -->
+<div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8 w-full">
+    <h2 class="text-lg font-bold mb-4 text-gray-700">Tren Inflasi (%)</h2>
+  <div class="relative w-full h-[300px]">
+    <canvas id="inflationChart"></canvas>
+</div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Konfigurasi umum agar tidak perlu tulis ulang berkali-kali
+        const chartOptions = { responsive: true, maintainAspectRatio: false };
+
+        // 1. Inisialisasi Chart GDP
+        const ctxGdp = document.getElementById('gdpChart').getContext('2d');
+        const gdpChart = new Chart(ctxGdp, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+                datasets: [{ label: 'GDP Growth', data: [], borderColor: '#3b82f6', tension: 0.3 }]
+            },
+            options: chartOptions
+        });
+
+        // 2. Inisialisasi Chart Inflasi
+        const ctxInflation = document.getElementById('inflationChart').getContext('2d');
+        const inflationChart = new Chart(ctxInflation, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+                datasets: [{ label: 'Inflasi', data: [], borderColor: '#ef4444', tension: 0.3 }]
+            },
+            options: chartOptions
+        });
+
+        // FUNGSI FETCH DATA GDP
+        fetch('/api/gdp-data')
+            .then(res => res.json())
+            .then(data => {
+                gdpChart.data.datasets[0].data = data.history;
+                gdpChart.update();
+            });
+
+        // FUNGSI FETCH DATA INFLASI (Pastikan endpoint ini sudah dibuat di route/controller)
+        fetch('/api/inflation-data')
+            .then(res => res.json())
+            .then(data => {
+                inflationChart.data.datasets[0].data = data.history;
+                inflationChart.update();
+            });
+    });
+</script>
+       
+
         <!-- Bagian Peta Interaktif -->
 <div class="mb-8">
     <h2 class="text-xl font-bold mb-4">Lokasi Negara</h2>
     <div id="map" class="h-64 rounded-xl shadow-sm border border-gray-100"></div>
 </div>
-
 
 <script>
     if(document.getElementById('map')) {
@@ -119,5 +175,55 @@
      data-name="{{ $data['country'] }}" 
      style="display:none;">
 </div>
+<!-- Di bagian bawah file, SEBELUM penutup </body> -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // Inisialisasi peta hanya setelah Leaflet JS dimuat
+    document.addEventListener("DOMContentLoaded", function() {
+        var element = document.getElementById('country-data');
+        var lat = parseFloat(element.getAttribute('data-lat'));
+        var lon = parseFloat(element.getAttribute('data-lon'));
+        
+        var map = L.map('map').setView([lat, lon], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        L.marker([lat, lon]).addTo(map);
+    });
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Fungsi untuk mengambil daftar negara
+        fetch('/api/countries')
+            .then(response => response.json())
+            .then(countries => {
+                const selects = [document.getElementById('country1'), document.getElementById('country2')];
+                
+                selects.forEach(select => {
+                    countries.forEach(country => {
+                        let option = document.createElement('option');
+                        option.value = country;
+                        option.text = country;
+                        select.appendChild(option);
+                    });
+                });
+            });
+    });
+
+    // Fungsi saat tombol Bandingkan diklik
+    function compareCountries() {
+        const country1 = document.getElementById('country1').value;
+        const country2 = document.getElementById('country2').value;
+
+        if (country1 === country2) {
+            alert("Pilih dua negara yang berbeda!");
+            return;
+        }
+
+        // Di sini kita akan panggil data perbandingan
+        console.log("Membandingkan: " + country1 + " vs " + country2);
+        // Kita akan isi bagian ini di langkah berikutnya setelah UI-nya siap!
+    }
+</script>
+</body>
 </body>
 </html>

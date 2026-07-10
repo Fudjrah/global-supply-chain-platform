@@ -7,6 +7,8 @@ use App\Services\WorldBankService;
 use App\Services\WeatherService;
 use App\Services\RestCountriesService;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use App\Models\EconomicIndicator;
 
 class RiskIntelligenceController extends Controller
 {
@@ -118,4 +120,45 @@ class RiskIntelligenceController extends Controller
         'label' => $positiveScore >= $negativeScore ? 'Positive' : 'Negative'
     ];
 }
+public function show($country)
+{
+    // ... logika pengambilan data lainnya ...
+
+    $data = [
+        'country' => 'Indonesia',
+        // ... data lainnya ...
+        
+        // TAMBAHKAN INI (Contoh data dummy)
+        'gdp_history' => [2.1, 2.3, 2.5, 2.4, 2.6, 2.8], 
+        'inflation_history' => [1.5, 1.6, 1.8, 1.7, 1.9, 2.0],
+    ];
+
+    return view('risk_dashboard', ['data' => $data]);
+}
+
+public function getInflationData()
+{
+    // Ganti dengan data real dari DB kamu
+    $inflationData = [1.5, 1.2, 1.8, 1.7, 1.9, 2.0];
+
+    return response()->json([
+        'history' => $inflationData
+    ]);
+}
+public function getGdpData()
+{
+    // Mengambil 6 data terakhir dari database berdasarkan tanggal atau urutan
+    $data = \App\Models\EconomicIndicator::where('indicator_name', 'GDP Growth')
+            ->orderBy('created_at', 'desc')
+            ->take(6)
+            ->get()
+            ->pluck('value') // Hanya mengambil kolom 'value'
+            ->reverse()      // Agar urutan dari bulan terlama ke terbaru
+            ->values();
+
+    return response()->json([
+        'history' => $data
+    ]);
+}
+
 }
