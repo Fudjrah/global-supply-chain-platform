@@ -20,7 +20,7 @@ class WorldBankService
 
         try {
             $client = Http::withoutVerifying()
-                ->timeout(12)
+                ->timeout(7)
                 ->withHeaders([
                     'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Platform/1.0'
                 ]);
