@@ -89,6 +89,62 @@ public function getRiskProfile(Request $request, string $countryName, string $co
         return $this->getRiskProfile($request, $name, $code);
     }
 
+    public function apiRiskProfile(Request $request)
+    {
+        $countryName = $request->query('name', '');
+        $countryCode = $request->query('code', '');
+
+        if (empty($countryName) || empty($countryCode)) {
+            return response()->json(['success' => false, 'error' => 'Parameter name dan code wajib diisi.'], 400);
+        }
+
+        if (strlen($countryCode) !== 2) {
+            return response()->json(['success' => false, 'error' => 'Format kode negara salah.'], 400);
+        }
+
+        try {
+            $countryInfo = $this->countriesService->getCountryInfoAsync($countryCode);
+            $officialName = $countryInfo['official_name'] ?? $countryName;
+            $coords = $this->countriesService->getCoordinatesAsync($officialName);
+            
+            $news = $this->newsService->getLatestNewsAsync($officialName . ' shipping logistics');
+            $weather = $this->weatherService->getWeatherAsync($coords['lat'] ?? 0, $coords['lon'] ?? 0);
+            $economy = $this->worldBankService->getEconomicIndicatorsAsync($countryCode);
+
+            $sentiment = $this->calculateSentiment($news['articles'] ?? []);
+            
+            // Hitung komponen
+            $weatherWind = $weather['windspeed'] ?? 0;
+            $weatherRisk = $weatherWind > 30 ? 30 : ($weatherWind > 15 ? 15 : 0);
+
+            $inflation = (float)str_replace(['%', ','], ['', '.'], $economy['inflation_rate']['value'] ?? 0);
+            $inflationRisk = $inflation > 5 ? 40 : ($inflation > 2 ? 20 : 0);
+
+            $newsRisk = $sentiment['label'] === 'Negative' ? 20 : 0;
+            
+            // Tambah random/dummy currency volatility risk agar komponen lengkap (0-10)
+            $currencyRisk = rand(5, 10);
+
+            $score = $weatherRisk + $inflationRisk + $newsRisk + $currencyRisk;
+            $finalScore = min($score, 100);
+
+            return response()->json([
+                'success' => true,
+                'country' => $officialName,
+                'risk_score' => $finalScore,
+                'risk_level' => $finalScore > 50 ? 'High Risk' : ($finalScore > 25 ? 'Medium Risk' : 'Low Risk'),
+                'components' => [
+                    'Weather Risk' => $weatherRisk,
+                    'Inflation Risk' => $inflationRisk,
+                    'News Sentiment Risk' => $newsRisk,
+                    'Currency Risk' => $currencyRisk
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
     private function calculateSentiment($newsArticles)
 {
     // Kamus kata sederhana
@@ -132,11 +188,112 @@ public function getInflationData()
     ]);
 }
 
-// GANTI INI di RiskIntelligenceController.php
-public function getCountryList()
-{
-    // Panggil WpiService agar data tidak kosong
-    // WpiService sudah ter-inject di __construct
-    return response()->json($this->wpiService->getCountryListFromApi());
-}
+    // GANTI INI di RiskIntelligenceController.php
+    public function getCountryList()
+    {
+        // Panggil WpiService agar data tidak kosong
+        // WpiService sudah ter-inject di __construct
+        return response()->json($this->wpiService->getCountryListFromApi());
+    }
+
+    public function getCountryStats(Request $request, $countryCode)
+    {
+        try {
+            // Gunakan $countryCode langsung untuk query
+            // Walaupun routernya `{country}`, isinya bisa name/code. Kita asumsikan code (contoh: ID, SG)
+            if (strlen($countryCode) !== 2 && strlen($countryCode) !== 3) {
+                // Mungkin dikirim nama negara, kita resolve
+                $countryInfo = $this->countriesService->getCountryInfoAsync($countryCode);
+                $countryCode = $countryInfo['cca2'] ?? $countryCode;
+            } else {
+                $countryInfo = $this->countriesService->getCountryInfoAsync($countryCode);
+            }
+
+            $officialName = $countryInfo['official_name'] ?? $countryCode;
+            $coords = $this->countriesService->getCoordinatesAsync($officialName);
+
+            // 1. Info Umum
+            $generalInfo = [
+                'name' => $officialName,
+                'flag' => $countryInfo['flag'] ?? null, // URL gambar bendera (RestCountries)
+                'population' => $countryInfo['population'] ?? null,
+                'region' => $countryInfo['region'] ?? null,
+            ];
+
+            // 2. Ekonomi (World Bank)
+            $economy = null;
+            try {
+                $economyRaw = $this->worldBankService->getEconomicIndicatorsAsync($countryCode);
+                $economy = [
+                    'gdp' => $economyRaw['gdp']['value'] ?? null,
+                    'inflation' => $economyRaw['inflation_rate']['value'] ?? null,
+                ];
+            } catch (\Exception $e) {
+                // Ignore jika gagal
+            }
+
+            // 3. Cuaca (Open-Meteo)
+            $weather = null;
+            try {
+                $weatherRaw = $this->weatherService->getWeatherAsync($coords['lat'] ?? 0, $coords['lon'] ?? 0);
+                $weather = [
+                    'temperature' => $weatherRaw['temperature'] ?? null,
+                    'windspeed' => $weatherRaw['windspeed'] ?? null,
+                    'rain' => $weatherRaw['rain'] ?? 0,
+                ];
+            } catch (\Exception $e) {
+                // Ignore jika gagal
+            }
+
+            // 4. Berita dengan Sentiment Analysis (GNews)
+            $newsData = [
+                'logistics' => [],
+                'geopolitics' => [],
+                'economy' => []
+            ];
+
+            try {
+                // Logistics
+                $newsLogistics = $this->newsService->getLatestNewsAsync($officialName . ' shipping OR logistics');
+                foreach (($newsLogistics['articles'] ?? []) as $index => $article) {
+                    if ($index >= 2) break; // Ambil 2 teratas
+                    $sent = $this->calculateSentiment([$article]);
+                    $article['sentiment'] = $sent['label'];
+                    $newsData['logistics'][] = $article;
+                }
+
+                // Geopolitics
+                $newsGeo = $this->newsService->getLatestNewsAsync($officialName . ' geopolitics OR conflict');
+                foreach (($newsGeo['articles'] ?? []) as $index => $article) {
+                    if ($index >= 2) break; 
+                    $sent = $this->calculateSentiment([$article]);
+                    $article['sentiment'] = $sent['label'];
+                    $newsData['geopolitics'][] = $article;
+                }
+
+                // Economy
+                $newsEcon = $this->newsService->getLatestNewsAsync($officialName . ' economy OR inflation');
+                foreach (($newsEcon['articles'] ?? []) as $index => $article) {
+                    if ($index >= 2) break; 
+                    $sent = $this->calculateSentiment([$article]);
+                    $article['sentiment'] = $sent['label'];
+                    $newsData['economy'][] = $article;
+                }
+            } catch (\Exception $e) {
+                // Ignore jika GNews rate limit
+            }
+
+            return response()->json([
+                'success' => true,
+                'country' => $officialName,
+                'general' => $generalInfo,
+                'economy' => $economy,
+                'weather' => $weather,
+                'news' => $newsData,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
 }

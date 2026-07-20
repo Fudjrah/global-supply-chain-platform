@@ -1,29 +1,36 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>Dashboard Anda</title>
-    <!-- Masukkan CSS Anda di sini -->
-</head>
-<body>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <!-- Header dengan Dropdown (Ini yang tadi) -->
-    <header style="padding: 15px; border-bottom: 1px solid #ccc;">
-        <nav>
-            <form action="{{ route('search') }}" method="GET">
-                <select name="iso_code" onchange="this.form.submit()">
-                    <option value="">Pilih Negara...</option>
-                    @foreach($countries as $country)
-                        <option value="{{ $country->iso_code }}">{{ $country->name }}</option>
-                    @endforeach
-                </select>
-            </form>
-        </nav>
-    </header>
+        <title>{{ config('app.name', 'Laravel') }}</title>
 
-    <!-- Content akan berubah sesuai halaman (Dashboard atau Hasil Pencarian) -->
-    <main>
-        @yield('content')
-    </main>
+        <!-- Fonts -->
+        <link rel="preconnect" href="https://fonts.bunny.net">
+        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
-</body>
+        <!-- Scripts -->
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    </head>
+    <body class="font-sans antialiased">
+        <div class="min-h-screen bg-gray-100">
+            @include('layouts.navigation')
+
+            <!-- Page Heading -->
+            @isset($header)
+                <header class="bg-white shadow">
+                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                        {{ $header }}
+                    </div>
+                </header>
+            @endisset
+
+            <!-- Page Content -->
+            <main>
+                {{ $slot }}
+            </main>
+        </div>
+    </body>
 </html>
