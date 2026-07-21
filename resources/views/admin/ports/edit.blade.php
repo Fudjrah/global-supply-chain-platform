@@ -1,30 +1,38 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Edit Data Pelabuhan') }}
-        </h2>
-    </x-slot>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Pelabuhan | Admin PortRisk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex min-h-screen">
 
-    <div class="py-12">
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-2xl border border-gray-150 p-8">
+    @include('admin.partials.sidebar', ['active' => 'ports'])
+
+    <main class="flex-1 p-8 overflow-auto">
+        <div class="max-w-2xl mx-auto">
+            <div class="mb-6">
+                <a href="{{ route('ports.index') }}" class="text-sm text-gray-500 hover:text-gray-800">← Kembali ke Daftar Pelabuhan</a>
+                <h1 class="text-2xl font-extrabold text-gray-900 mt-2">Edit Pelabuhan: {{ $port->name }}</h1>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
                 <form method="POST" action="{{ route('ports.update', $port) }}">
                     @csrf
                     @method('PUT')
 
-                    <!-- Name -->
-                    <div>
-                        <label for="name" class="block font-medium text-sm text-gray-700">Nama Pelabuhan</label>
-                        <input id="name" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" type="text" name="name" value="{{ old('name', $port->name) }}" required autofocus />
-                        @error('name')
-                            <p class="text-rose-500 text-xs mt-1">{{ $message }}</p>
-                        @enderror
+                    <div class="mb-5">
+                        <label for="name" class="block text-sm font-semibold text-gray-700 mb-1">Nama Pelabuhan</label>
+                        <input id="name" type="text" name="name" value="{{ old('name', $port->name) }}" required autofocus
+                            class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition text-sm">
+                        @error('name') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    <!-- Country -->
-                    <div class="mt-4">
-                        <label for="country_id" class="block font-medium text-sm text-gray-700">Negara</label>
-                        <select id="country_id" name="country_id" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" required>
+                    <div class="mb-5">
+                        <label for="country_id" class="block text-sm font-semibold text-gray-700 mb-1">Negara</label>
+                        <select id="country_id" name="country_id" required
+                            class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition text-sm">
                             <option value="">Pilih Negara...</option>
                             @foreach ($countries as $country)
                                 <option value="{{ $country->id }}" {{ old('country_id', $port->country_id) == $country->id ? 'selected' : '' }}>
@@ -32,48 +40,40 @@
                                 </option>
                             @endforeach
                         </select>
-                        @error('country_id')
-                            <p class="text-rose-500 text-xs mt-1">{{ $message }}</p>
-                        @enderror
+                        @error('country_id') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    <!-- Latitude -->
-                    <div class="mt-4">
-                        <label for="latitude" class="block font-medium text-sm text-gray-700">Latitude</label>
-                        <input id="latitude" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" type="number" step="0.00000001" name="latitude" value="{{ old('latitude', $port->latitude) }}" required />
-                        @error('latitude')
-                            <p class="text-rose-500 text-xs mt-1">{{ $message }}</p>
-                        @enderror
+                    <div class="grid grid-cols-2 gap-4 mb-5">
+                        <div>
+                            <label for="latitude" class="block text-sm font-semibold text-gray-700 mb-1">Latitude</label>
+                            <input id="latitude" type="number" step="0.00000001" name="latitude" value="{{ old('latitude', $port->latitude) }}" required
+                                class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition text-sm">
+                            @error('latitude') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="longitude" class="block text-sm font-semibold text-gray-700 mb-1">Longitude</label>
+                            <input id="longitude" type="number" step="0.00000001" name="longitude" value="{{ old('longitude', $port->longitude) }}" required
+                                class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition text-sm">
+                            @error('longitude') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
                     </div>
 
-                    <!-- Longitude -->
-                    <div class="mt-4">
-                        <label for="longitude" class="block font-medium text-sm text-gray-700">Longitude</label>
-                        <input id="longitude" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" type="number" step="0.00000001" name="longitude" value="{{ old('longitude', $port->longitude) }}" required />
-                        @error('longitude')
-                            <p class="text-rose-500 text-xs mt-1">{{ $message }}</p>
-                        @enderror
+                    <div class="mb-6">
+                        <label for="type" class="block text-sm font-semibold text-gray-700 mb-1">Tipe Pelabuhan</label>
+                        <input id="type" type="text" name="type" value="{{ old('type', $port->type) }}" placeholder="Contoh: Seaport, Container Terminal"
+                            class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition text-sm">
+                        @error('type') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    <!-- Port Type -->
-                    <div class="mt-4">
-                        <label for="type" class="block font-medium text-sm text-gray-700">Tipe Pelabuhan</label>
-                        <input id="type" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" type="text" name="type" placeholder="Contoh: Seaport, Container Terminal" value="{{ old('type', $port->type) }}" />
-                        @error('type')
-                            <p class="text-rose-500 text-xs mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
-
-                    <div class="flex items-center justify-end mt-8 gap-4">
-                        <a class="text-sm text-gray-600 hover:text-gray-900" href="{{ route('ports.index') }}">
-                            Batal
-                        </a>
-                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow transition">
+                    <div class="flex items-center justify-end gap-4">
+                        <a href="{{ route('ports.index') }}" class="text-sm text-gray-500 hover:text-gray-800">Batal</a>
+                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition text-sm">
                             Simpan Perubahan
                         </button>
                     </div>
                 </form>
             </div>
         </div>
-    </div>
-</x-app-layout>
+    </main>
+</body>
+</html>

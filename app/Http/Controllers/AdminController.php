@@ -17,7 +17,8 @@ class AdminController extends Controller
         $userCount = User::count();
         $portCount = Port::count();
         $articleCount = Article::count();
+        $countryCount = 250;
 
-        return view('admin.dashboard', compact('userCount', 'portCount', 'articleCount'));
+        return view('admin.dashboard', compact('userCount', 'portCount', 'articleCount', 'countryCount'));
     }
 }

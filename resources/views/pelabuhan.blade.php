@@ -30,10 +30,31 @@
         <a href="/" class="block py-2 px-4 hover:bg-gray-800 rounded-lg">Dashboard</a>
         <a href="/perbandingan" class="block py-2 px-4 hover:bg-gray-800 rounded-lg">Perbandingan Negara</a>
         <a href="/pelabuhan" class="block py-2 px-4 bg-blue-600 rounded-lg">Data Pelabuhan</a>
+
+        @if(auth()->check() && auth()->user()->role === 'admin')
+            <a href="{{ route('admin.dashboard') }}" class="block py-2 px-4 hover:bg-gray-800 rounded-lg">Admin Panel</a>
+        @endif
         @auth
-            @can('manage-admin')
-                <a href="{{ route('admin.dashboard') }}" class="block py-2 px-4 hover:bg-gray-800 rounded-lg">Admin Panel</a>
-            @endcan
+            <div class="mt-8 pt-8 border-t border-gray-800">
+                <p class="text-xs text-gray-400">Masuk sebagai:</p>
+                <p class="text-sm font-semibold text-white truncate" title="{{ Auth::user()->email }}">{{ Auth::user()->name }}</p>
+                <p class="text-xs text-blue-400 capitalize mb-4">{{ Auth::user()->role }}</p>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 px-4 rounded-lg text-sm transition">
+                        Logout
+                    </button>
+                </form>
+            </div>
+        @else
+            <div class="mt-8 pt-8 border-t border-gray-800 space-y-2">
+                <a href="{{ route('login') }}" class="block text-center bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg text-sm transition">
+                    Login
+                </a>
+                <a href="{{ route('register') }}" class="block text-center border border-gray-700 hover:bg-gray-800 text-gray-300 font-bold py-2 px-4 rounded-lg text-sm transition">
+                    Register
+                </a>
+            </div>
         @endauth
     </nav>
 </aside>

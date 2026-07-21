@@ -12,7 +12,7 @@ class ArticleController extends Controller
     {
         Gate::authorize('manage-admin');
 
-        $articles = Article::paginate(10);
+        $articles = Article::latest('published_at')->paginate(15);
         return view('admin.articles.index', compact('articles'));
     }
 
@@ -28,14 +28,16 @@ class ArticleController extends Controller
         Gate::authorize('manage-admin');
 
         $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'source' => ['nullable', 'string', 'max:255'],
-            'url' => ['nullable', 'url', 'max:255'],
+            'title'        => ['required', 'string', 'max:255'],
+            'content'      => ['nullable', 'string'],
+            'category'     => ['nullable', 'string', 'max:255'],
+            'author'       => ['nullable', 'string', 'max:255'],
+            'source'       => ['nullable', 'string', 'max:255'],
+            'url'          => ['nullable', 'url', 'max:255'],
             'published_at' => ['required', 'date'],
         ]);
 
-        Article::create($request->all());
+        Article::create($request->only(['title', 'content', 'category', 'author', 'source', 'url', 'published_at']));
 
         return redirect()->route('articles.index')->with('success', 'Artikel berhasil ditambahkan.');
     }
@@ -52,14 +54,16 @@ class ArticleController extends Controller
         Gate::authorize('manage-admin');
 
         $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'source' => ['nullable', 'string', 'max:255'],
-            'url' => ['nullable', 'url', 'max:255'],
+            'title'        => ['required', 'string', 'max:255'],
+            'content'      => ['nullable', 'string'],
+            'category'     => ['nullable', 'string', 'max:255'],
+            'author'       => ['nullable', 'string', 'max:255'],
+            'source'       => ['nullable', 'string', 'max:255'],
+            'url'          => ['nullable', 'url', 'max:255'],
             'published_at' => ['required', 'date'],
         ]);
 
-        $article->update($request->all());
+        $article->update($request->only(['title', 'content', 'category', 'author', 'source', 'url', 'published_at']));
 
         return redirect()->route('articles.index')->with('success', 'Artikel berhasil diperbarui.');
     }

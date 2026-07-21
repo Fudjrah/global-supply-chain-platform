@@ -6,6 +6,8 @@
     <title>PortRisk Integra | Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         .card-idle { opacity: 0.55; }
         .card-active { opacity: 1; transition: opacity 0.4s; }
@@ -31,12 +33,30 @@
         <a href="/" class="block py-2 px-4 {{ request()->is('/') ? 'bg-blue-600' : 'hover:bg-gray-800' }} rounded-lg">Dashboard</a>
         <a href="/perbandingan" class="block py-2 px-4 {{ request()->is('perbandingan') ? 'bg-blue-600' : 'hover:bg-gray-800' }} rounded-lg">Perbandingan Negara</a>
         <a href="/pelabuhan" class="block py-2 px-4 {{ request()->is('pelabuhan') ? 'bg-blue-600' : 'hover:bg-gray-800' }} rounded-lg">Data Pelabuhan</a>
+        @if(auth()->check() && auth()->user()->role === 'admin')
+            <a href="{{ route('admin.dashboard') }}" class="block py-2 px-4 hover:bg-gray-800 rounded-lg">Admin Panel</a>
+        @endif
         @auth
-            @can('manage-admin')
-                <a href="{{ route('admin.dashboard') }}" class="block py-2 px-4 hover:bg-gray-800 rounded-lg">Admin Panel</a>
-            @endcan
+            <div class="mt-8 pt-8 border-t border-gray-800">
+                <p class="text-xs text-gray-400">Masuk sebagai:</p>
+                <p class="text-sm font-semibold text-white truncate" title="{{ Auth::user()->email }}">{{ Auth::user()->name }}</p>
+                <p class="text-xs text-blue-400 capitalize mb-4">{{ Auth::user()->role }}</p>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 px-4 rounded-lg text-sm transition">
+                        Logout
+                    </button>
+                </form>
+            </div>
         @else
-            {{-- If user is not logged in, do not show admin panel option --}}
+            <div class="mt-8 pt-8 border-t border-gray-800 space-y-2">
+                <a href="{{ route('login') }}" class="block text-center bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg text-sm transition">
+                    Login
+                </a>
+                <a href="{{ route('register') }}" class="block text-center border border-gray-700 hover:bg-gray-800 text-gray-300 font-bold py-2 px-4 rounded-lg text-sm transition">
+                    Register
+                </a>
+            </div>
         @endauth
     </nav>
 </aside>
@@ -136,14 +156,28 @@
                                 <p id="csPop" class="text-xs text-gray-500"></p>
                             </div>
                         </div>
+                        <div class="mb-4">
+                            <p class="text-xs text-gray-500"><strong>Region:</strong> <span id="csRegion"></span></p>
+                            <p class="text-xs text-gray-500"><strong>Bahasa:</strong> <span id="csLang"></span></p>
+                        </div>
 
                         <!-- 2 & 3. Ekonomi & Cuaca -->
                         <div class="grid grid-cols-2 gap-4 mb-6">
                             <!-- Ekonomi -->
                             <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                                 <p class="text-xs font-semibold text-gray-600 mb-2">Ekonomi</p>
-                                <p class="text-xs text-gray-500 mb-1">GDP: <span id="csGdp" class="font-bold text-gray-800">N/A</span></p>
-                                <p class="text-xs text-gray-500">Inflasi: <span id="csInf" class="font-bold text-gray-800">N/A</span></p>
+                                <div class="mb-2">
+                                    <p class="text-xs text-gray-500">GDP: <span id="csGdp" class="font-bold text-gray-800">N/A</span></p>
+                                    <div class="relative h-12 w-full mt-1">
+                                        <canvas id="csGdpChart"></canvas>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500">Inflasi: <span id="csInf" class="font-bold text-gray-800">N/A</span></p>
+                                    <div class="relative h-12 w-full mt-1">
+                                        <canvas id="csInfChart"></canvas>
+                                    </div>
+                                </div>
                             </div>
                             <!-- Cuaca -->
                             <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
@@ -159,6 +193,15 @@
                             <div id="csNewsContainer" class="space-y-3">
                                 <p class="text-xs text-gray-400 italic">Memuat berita...</p>
                             </div>
+                        </div>
+
+                        <!-- 5. Peta Pelabuhan & Cuaca Overlay -->
+                        <div class="mt-6 pt-6 border-t border-gray-100">
+                            <div class="flex justify-between items-center mb-2">
+                                <p class="text-xs font-semibold text-gray-600">Peta Pelabuhan</p>
+                                <div id="mapWeatherOverlay" class="flex gap-2"></div>
+                            </div>
+                            <div id="countryMap" class="h-64 w-full rounded-xl border border-gray-200 z-0 relative"></div>
                         </div>
                     </div>
 
@@ -214,6 +257,10 @@
 <script>
     let sparklineChartInstance = null;
     let riskChartInstance = null;
+    let csGdpChartInstance = null;
+    let csInfChartInstance = null;
+    let countryMapInstance = null;
+    let countryMapMarkers = [];
 
     // --- State Handler Currency Card ---
     function showCurrencyState(state, msg = '') {
@@ -461,6 +508,9 @@
             if (data.general) {
                 document.getElementById('csName').textContent = data.general.name || '-';
                 document.getElementById('csPop').textContent = data.general.population ? `Populasi: ${data.general.population}` : '';
+                document.getElementById('csRegion').textContent = (data.general.region || '-') + (data.general.subregion ? ` (${data.general.subregion})` : '');
+                document.getElementById('csLang').textContent = data.general.languages || '-';
+                
                 const flagImg = document.getElementById('csFlag');
                 if (data.general.flag) {
                     flagImg.src = data.general.flag;
@@ -474,12 +524,115 @@
             if (data.economy) {
                 document.getElementById('csGdp').textContent = data.economy.gdp || 'N/A';
                 document.getElementById('csInf').textContent = data.economy.inflation || 'N/A';
+                
+                // Mini chart GDP
+                if (csGdpChartInstance) csGdpChartInstance.destroy();
+                if (data.economy.gdp_history && data.economy.gdp_history.labels.length > 0) {
+                    const ctxGdp = document.getElementById('csGdpChart').getContext('2d');
+                    csGdpChartInstance = new Chart(ctxGdp, {
+                        type: 'line',
+                        data: {
+                            labels: data.economy.gdp_history.labels,
+                            datasets: [{
+                                data: data.economy.gdp_history.data,
+                                borderColor: 'rgba(59, 130, 246, 1)',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false }, tooltip: { enabled: true } },
+                            scales: { x: { display: false }, y: { display: false } }
+                        }
+                    });
+                }
+
+                // Mini chart Inflation
+                if (csInfChartInstance) csInfChartInstance.destroy();
+                if (data.economy.inflation_history && data.economy.inflation_history.labels.length > 0) {
+                    const ctxInf = document.getElementById('csInfChart').getContext('2d');
+                    csInfChartInstance = new Chart(ctxInf, {
+                        type: 'line',
+                        data: {
+                            labels: data.economy.inflation_history.labels,
+                            datasets: [{
+                                data: data.economy.inflation_history.data,
+                                borderColor: 'rgba(239, 68, 68, 1)',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false }, tooltip: { enabled: true } },
+                            scales: { x: { display: false }, y: { display: false } }
+                        }
+                    });
+                }
             }
 
             // 3. Cuaca
             if (data.weather) {
                 document.getElementById('csTemp').textContent = data.weather.temperature ? `${data.weather.temperature}°C` : 'N/A';
                 document.getElementById('csWind').textContent = data.weather.windspeed ? `${data.weather.windspeed} km/h` : 'N/A';
+                
+                // Weather Overlay for map
+                const weatherOverlay = document.getElementById('mapWeatherOverlay');
+                weatherOverlay.innerHTML = '';
+                
+                const windSpeed = data.weather.windspeed || 0;
+                const rain = data.weather.rain || 0;
+                
+                if (rain > 0) {
+                    weatherOverlay.innerHTML += `<span class="flex items-center text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-bold">🌧️ Hujan</span>`;
+                } else {
+                    weatherOverlay.innerHTML += `<span class="flex items-center text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-bold">☁️ Berawan/Cerah</span>`;
+                }
+                
+                if (windSpeed > 40) {
+                    weatherOverlay.innerHTML += `<span class="flex items-center text-[10px] bg-rose-100 text-rose-700 px-2 py-1 rounded-full font-bold">⚠️ Badai/Angin Kencang</span>`;
+                } else if (windSpeed > 20) {
+                    weatherOverlay.innerHTML += `<span class="flex items-center text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-bold">💨 Angin Sedang</span>`;
+                }
+            }
+
+            // Peta Pelabuhan
+            if (data.general && data.general.latlng) {
+                if (!countryMapInstance) {
+                    countryMapInstance = L.map('countryMap').setView(data.general.latlng, 5);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; OpenStreetMap contributors'
+                    }).addTo(countryMapInstance);
+                } else {
+                    countryMapInstance.setView(data.general.latlng, 5);
+                }
+
+                // Hapus marker lama
+                countryMapMarkers.forEach(m => countryMapInstance.removeLayer(m));
+                countryMapMarkers = [];
+
+                // Tambahkan marker baru dari data ports
+                if (data.general.ports && data.general.ports.length > 0) {
+                    data.general.ports.forEach(port => {
+                        const marker = L.marker([port.latitude, port.longitude]).addTo(countryMapInstance);
+                        marker.bindPopup(`<b>${port.name}</b><br>${port.type}<br>Lat: ${port.latitude}, Lng: ${port.longitude}`);
+                        countryMapMarkers.push(marker);
+                    });
+                }
+                
+                // Fix Leaflet rendering issue if it was hidden
+                setTimeout(() => {
+                    countryMapInstance.invalidateSize();
+                }, 300);
             }
 
             // 4. Berita

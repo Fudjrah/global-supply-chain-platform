@@ -107,4 +107,70 @@ class WorldBankService
             'source' => "Platform Intelligence Safe-Mode ({$reason})"
         ];
     }
+
+    /**
+     * Fetch GDP (NY.GDP.MKTP.CD) and Inflation (FP.CPI.TOTL.ZG) history for the last 5 years
+     */
+    public function getEconomicHistoryAsync(string $countryCode)
+    {
+        $code = strtolower($countryCode);
+        $gdpIndicator = "NY.GDP.MKTP.CD"; // As requested by user
+        $inflationIndicator = "FP.CPI.TOTL.ZG";
+
+        $gdpUrl = "https://api.worldbank.org/v2/country/{$code}/indicator/{$gdpIndicator}?format=json&per_page=10";
+        $inflationUrl = "https://api.worldbank.org/v2/country/{$code}/indicator/{$inflationIndicator}?format=json&per_page=10";
+
+        $result = [
+            'gdp' => ['labels' => [], 'data' => [], 'latest' => 'N/A'],
+            'inflation' => ['labels' => [], 'data' => [], 'latest' => 'N/A'],
+        ];
+
+        try {
+            $client = Http::withoutVerifying()->timeout(7);
+
+            // Fetch GDP
+            $resGdp = $client->get($gdpUrl);
+            if ($resGdp->successful() && isset($resGdp->json()[1])) {
+                $gdpData = collect($resGdp->json()[1])->filter(function($item) {
+                    return !is_null($item['value']);
+                })->take(5)->reverse()->values();
+
+                foreach ($gdpData as $item) {
+                    $result['gdp']['labels'][] = $item['date'];
+                    $result['gdp']['data'][] = $item['value'];
+                }
+                
+                if ($gdpData->isNotEmpty()) {
+                    // Format latest GDP
+                    $latestVal = $gdpData->last()['value'];
+                    if ($latestVal >= 1000000000000) {
+                        $result['gdp']['latest'] = '$' . number_format($latestVal / 1000000000000, 2) . 'T';
+                    } elseif ($latestVal >= 1000000000) {
+                        $result['gdp']['latest'] = '$' . number_format($latestVal / 1000000000, 2) . 'B';
+                    } else {
+                        $result['gdp']['latest'] = '$' . number_format($latestVal);
+                    }
+                }
+            }
+
+            // Fetch Inflation
+            $resInf = $client->get($inflationUrl);
+            if ($resInf->successful() && isset($resInf->json()[1])) {
+                $infData = collect($resInf->json()[1])->filter(function($item) {
+                    return !is_null($item['value']);
+                })->take(5)->reverse()->values();
+
+                foreach ($infData as $item) {
+                    $result['inflation']['labels'][] = $item['date'];
+                    $result['inflation']['data'][] = number_format($item['value'], 2, '.', '');
+                }
+                
+                if ($infData->isNotEmpty()) {
+                    $result['inflation']['latest'] = number_format($infData->last()['value'], 2) . '%';
+                }
+            }
+        } catch (\Exception $e) {}
+
+        return $result;
+    }
 }

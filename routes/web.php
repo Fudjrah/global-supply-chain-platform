@@ -54,11 +54,11 @@ Route::middleware('auth')->group(function () {
 
 require __DIR__.'/auth.php';
 
-Route::middleware(['auth', 'verified', 'admin'])->group(function () {
+Route::middleware(['auth', 'verified', 'admin.only'])->group(function () {
     Route::get('/admin', [AdminController::class, 'index'])->name('admin.dashboard');
     Route::get('/admin/dashboard', [AdminController::class, 'index']);
-    // Rute untuk kelola User, Dataset, dan Artikel
-    Route::resource('/admin/users', UserController::class);
-    Route::resource('/admin/ports', PortController::class);
-    Route::resource('/admin/articles', ArticleController::class);
+    // Resource routes — names match controller redirects (users.index, ports.index, articles.index)
+    Route::resource('/admin/users', UserController::class)->names('users');
+    Route::resource('/admin/ports', PortController::class)->names('ports');
+    Route::resource('/admin/articles', ArticleController::class)->names('articles');
 });

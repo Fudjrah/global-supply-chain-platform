@@ -212,21 +212,50 @@ public function getInflationData()
             $officialName = $countryInfo['official_name'] ?? $countryCode;
             $coords = $this->countriesService->getCoordinatesAsync($officialName);
 
+            // CALL REST COUNTRIES HERE to get detailed data:
+            $restCountriesData = [];
+            try {
+                $restResponse = \Illuminate\Support\Facades\Http::withoutVerifying()->get("https://restcountries.com/v3.1/alpha/" . $countryCode);
+                if ($restResponse->successful()) {
+                    $restCountriesData = $restResponse->json()[0];
+                }
+            } catch (\Exception $e) {}
+
+            $flagUrl = $restCountriesData['flags']['png'] ?? ($countryInfo['flag_png'] ?? null);
+            $officialNameRest = $restCountriesData['name']['official'] ?? $officialName;
+            $region = $restCountriesData['region'] ?? ($countryInfo['region'] ?? null);
+            $subregion = $restCountriesData['subregion'] ?? null;
+            $languages = isset($restCountriesData['languages']) ? implode(', ', array_values($restCountriesData['languages'])) : null;
+            $population = isset($restCountriesData['population']) ? number_format($restCountriesData['population'], 0, ',', '.') : ($countryInfo['population'] ?? null);
+            $latlng = $restCountriesData['latlng'] ?? [$coords['lat'] ?? 0, $coords['lon'] ?? 0];
+
+            // Ambil pelabuhan di negara ini
+            $ports = \App\Models\Port::whereHas('country', function($q) use ($countryCode, $officialName) {
+                $q->where('country_code', $countryCode)
+                  ->orWhere('name', 'LIKE', '%' . $officialName . '%');
+            })->get(['name', 'latitude', 'longitude', 'type']);
+
             // 1. Info Umum
             $generalInfo = [
-                'name' => $officialName,
-                'flag' => $countryInfo['flag'] ?? null, // URL gambar bendera (RestCountries)
-                'population' => $countryInfo['population'] ?? null,
-                'region' => $countryInfo['region'] ?? null,
+                'name' => $officialNameRest,
+                'flag' => $flagUrl,
+                'population' => $population,
+                'region' => $region,
+                'subregion' => $subregion,
+                'languages' => $languages,
+                'latlng' => $latlng,
+                'ports' => $ports,
             ];
 
-            // 2. Ekonomi (World Bank)
+            // 2. Ekonomi (World Bank - History 5 Years)
             $economy = null;
             try {
-                $economyRaw = $this->worldBankService->getEconomicIndicatorsAsync($countryCode);
+                $economyData = $this->worldBankService->getEconomicHistoryAsync($countryCode);
                 $economy = [
-                    'gdp' => $economyRaw['gdp']['value'] ?? null,
-                    'inflation' => $economyRaw['inflation_rate']['value'] ?? null,
+                    'gdp' => $economyData['gdp']['latest'] ?? 'N/A',
+                    'inflation' => $economyData['inflation']['latest'] ?? 'N/A',
+                    'gdp_history' => $economyData['gdp'] ?? null,
+                    'inflation_history' => $economyData['inflation'] ?? null,
                 ];
             } catch (\Exception $e) {
                 // Ignore jika gagal

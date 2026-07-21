@@ -1,65 +1,81 @@
-<x-app-layout>
-    <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Kelola Artikel Analisis') }}
-            </h2>
-            <a href="{{ route('articles.create') }}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow transition">
-                + Tambah Artikel
-            </a>
-        </div>
-    </x-slot>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelola Artikel | Admin PortRisk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex min-h-screen">
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            @if (session('success'))
-                <div class="mb-4 bg-emerald-100 border border-emerald-400 text-emerald-700 px-4 py-3 rounded relative" role="alert">
-                    <span class="block sm:inline">{{ session('success') }}</span>
-                </div>
+    @include('admin.partials.sidebar', ['active' => 'articles'])
+
+    <main class="flex-1 p-8 overflow-auto">
+        <div class="max-w-7xl mx-auto">
+            @if(session('success'))
+                <div class="mb-5 bg-emerald-50 border border-emerald-300 text-emerald-800 px-5 py-3 rounded-xl text-sm font-medium">✅ {{ session('success') }}</div>
             @endif
 
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-2xl border border-gray-150">
-                <div class="p-6 text-gray-900">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Judul Artikel</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sumber</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal Rilis</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                @foreach ($articles as $article)
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                                            @if ($article->url)
-                                                <a href="{{ $article->url }}" target="_blank" class="text-indigo-600 hover:underline">{{ $article->title }}</a>
-                                            @else
-                                                {{ $article->title }}
-                                            @endif
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $article->source ?? '-' }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $article->published_at ? $article->published_at->format('d M Y') : '-' }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                                            <a href="{{ route('articles.edit', $article) }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
-                                            <form action="{{ route('articles.destroy', $article) }}" method="POST" class="inline-block" onsubmit="return confirm('Apakah Anda yakin ingin menghapus artikel ini?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="text-rose-600 hover:text-rose-900">Hapus</button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="mt-4">
-                        {{ $articles->links() }}
-                    </div>
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h1 class="text-2xl font-extrabold text-gray-900">Kelola Artikel Analisis</h1>
+                    <p class="text-gray-500 text-sm mt-0.5">Publikasikan dan kelola artikel analisis risiko logistik.</p>
+                </div>
+                <a href="{{ route('articles.create') }}" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 px-5 rounded-xl shadow transition text-sm">
+                    + Tambah Artikel
+                </a>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-100">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Judul</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Kategori</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Penulis</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Tanggal</th>
+                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @forelse ($articles as $article)
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="px-6 py-4 text-sm">
+                                    <p class="font-semibold text-gray-900">{{ Str::limit($article->title, 60) }}</p>
+                                    @if($article->url)
+                                        <a href="{{ $article->url }}" target="_blank" class="text-xs text-blue-500 hover:underline">Lihat URL ↗</a>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4">
+                                    @if($article->category)
+                                        <span class="px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full text-xs font-medium">{{ $article->category }}</span>
+                                    @else
+                                        <span class="text-gray-300 text-xs">-</span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-500">{{ $article->author ?? '-' }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-400">{{ $article->published_at ? $article->published_at->format('d M Y') : '-' }}</td>
+                                <td class="px-6 py-4 text-right text-sm space-x-3">
+                                    <a href="{{ route('articles.edit', $article) }}" class="text-indigo-600 hover:text-indigo-900 font-medium">Edit</a>
+                                    <form action="{{ route('articles.destroy', $article) }}" method="POST" class="inline-block" onsubmit="return confirm('Hapus artikel ini?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-rose-600 hover:text-rose-900 font-medium">Hapus</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="px-6 py-10 text-center text-gray-400 text-sm">Belum ada artikel yang dipublikasikan.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+                <div class="px-6 py-4 border-t border-gray-100">
+                    {{ $articles->links() }}
                 </div>
             </div>
         </div>
-    </div>
-</x-app-layout>
+    </main>
+</body>
+</html>
